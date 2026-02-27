@@ -1,7 +1,10 @@
 import asyncio
+import logging
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
+
+logger = logging.getLogger(__name__)
 
 from app.auth.microsoft import acquire_token_silent, load_cache
 from app.auth.session import get_session
@@ -39,7 +42,8 @@ async def dashboard(request: Request):
             get_ca_policies(token),
         )
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Graph API error: {exc}") from exc
+        logger.error("Graph API error: %s", exc)
+        raise HTTPException(status_code=502, detail="Microsoft Graph request failed") from exc
 
     return build_dashboard(org, active, eligible, ca)
 

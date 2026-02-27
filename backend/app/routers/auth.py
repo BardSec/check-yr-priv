@@ -1,4 +1,5 @@
 import secrets
+from urllib.parse import quote
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, RedirectResponse, Response
@@ -7,6 +8,9 @@ from app.auth.microsoft import acquire_token_by_code, get_auth_url, load_cache
 from app.auth.session import clear_session, get_session, save_session
 from app.config import settings
 from app.services.graph import get_me
+
+# Fields from id_token_claims exposed to the browser
+_USER_FIELDS = {"oid", "name", "preferred_username", "tid"}
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -25,7 +29,7 @@ async def login(request: Request):
 @router.get("/callback")
 async def callback(request: Request, code: str | None = None, state: str | None = None, error: str | None = None):
     if error:
-        return RedirectResponse(f"{settings.app_base_url}/?error={error}")
+        return RedirectResponse(f"{settings.app_base_url}/?error={quote(str(error))}")
 
     session = await get_session(request)
     expected_state = session.get("oauth_state")
@@ -36,7 +40,7 @@ async def callback(request: Request, code: str | None = None, state: str | None 
     result = acquire_token_by_code(code, cache)
 
     if "error" in result:
-        return RedirectResponse(f"{settings.app_base_url}/?error={result.get('error_description', 'auth_failed')}")
+        return RedirectResponse(f"{settings.app_base_url}/?error={quote(result.get('error_description', 'auth_failed'))}")
 
     session["token_cache"] = cache.serialize()
     session["account"] = result.get("id_token_claims", {})
@@ -53,7 +57,8 @@ async def me(request: Request):
     account = session.get("account")
     if not account:
         return JSONResponse({"authenticated": False}, status_code=401)
-    return {"authenticated": True, "user": account}
+    user = {k: v for k, v in account.items() if k in _USER_FIELDS}
+    return {"authenticated": True, "user": user}
 
 
 @router.post("/logout")
