@@ -18,7 +18,8 @@ async function request(path, options = {}) {
 }
 
 export const api = {
-  me: () => request("/auth/me"),
+  me: () =>
+    fetch(BASE + "/auth/me", { credentials: "include" }).then((r) => r.json()),
   logout: () => request("/auth/logout", { method: "POST" }),
   dashboard: () => request("/api/dashboard"),
 };
