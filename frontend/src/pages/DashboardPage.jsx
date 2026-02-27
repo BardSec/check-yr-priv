@@ -1,4 +1,4 @@
-import { RefreshCw, ShieldAlert, ShieldCheck, Users, Zap } from "lucide-react";
+import { Download, RefreshCw, ShieldAlert, ShieldCheck, Users, Zap } from "lucide-react";
 import { AlertBanner } from "../components/AlertBanner";
 import { Layout } from "../components/Layout";
 import { ProtectionChart } from "../components/ProtectionChart";
@@ -30,6 +30,57 @@ function ErrorView({ message, onRetry }) {
   );
 }
 
+function exportCsv(data) {
+  const headers = [
+    "Role Name",
+    "High Privilege",
+    "CA Policy Protected",
+    "MFA Required",
+    "Principal Name",
+    "Principal UPN",
+    "Principal Type",
+    "Assignment Type",
+    "Permanent",
+    "Member Type",
+    "Start Date (UTC)",
+    "End Date (UTC)",
+  ];
+
+  const escape = (v) => {
+    if (v == null) return "";
+    const s = String(v);
+    return s.includes(",") || s.includes('"') || s.includes("\n")
+      ? `"${s.replace(/"/g, '""')}"`
+      : s;
+  };
+
+  const rows = data.roles.flatMap((role) =>
+    role.assignments.map((a) => [
+      role.roleName,
+      role.isHighPrivilege ? "Yes" : "No",
+      role.caProtected ? "Yes" : "No",
+      role.mfaRequired ? "Yes" : "No",
+      a.principalName,
+      a.principalUpn ?? "",
+      a.principalType,
+      a.assignmentType,
+      a.isPermanent ? "Yes" : "No",
+      a.memberType ?? "Direct",
+      a.startDateTime ? new Date(a.startDateTime).toISOString() : "",
+      a.endDateTime ? new Date(a.endDateTime).toISOString() : "",
+    ])
+  );
+
+  const csv = [headers, ...rows].map((row) => row.map(escape).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `entra-roles-${data.tenantId}-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 export function DashboardPage({ user, onLogout }) {
   const { data, loading, error, refresh } = useDashboard();
 
@@ -50,10 +101,16 @@ export function DashboardPage({ user, onLogout }) {
                 <span className="font-mono text-slate-500 text-xs">{data.tenantId}</span>
               </p>
             </div>
-            <button onClick={refresh} className="btn-ghost text-xs">
-              <RefreshCw className="w-4 h-4" />
-              Refresh
-            </button>
+            <div className="flex gap-2">
+              <button onClick={() => exportCsv(data)} className="btn-ghost text-xs">
+                <Download className="w-4 h-4" />
+                Export CSV
+              </button>
+              <button onClick={refresh} className="btn-ghost text-xs">
+                <RefreshCw className="w-4 h-4" />
+                Refresh
+              </button>
+            </div>
           </div>
 
           {/* Alert */}
